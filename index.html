@@ -599,5 +599,62 @@ body::after {
   </div>
 </footer>
 
+<script>
+/* ============================================================
+   LIVE MENU — reads the "La Pincha Menu (LIVE)" Google Sheet.
+   Columns: Section | Dish | Description | Price | Section tagline
+   Edit the sheet, reload the site, the menu card updates.
+   If the sheet is unreachable, the built-in menu stays.
+   ============================================================ */
+(function() {
+  var SHEET = 'https://docs.google.com/spreadsheets/d/1P0Il1ptwOwdLQMlG4DgCPK-ufqrXJyNKCFBvwegQu7c/gviz/tq?tqx=out:csv&cb=' + Date.now();
+  fetch(SHEET)
+    .then(function(r) { if (!r.ok) throw new Error('sheet unreachable'); return r.text(); })
+    .then(function(csv) {
+      var rows = csv.split('\n').map(function(line) {
+        var cells = [];
+        var re = /"((?:[^"]|"")*)"/g, m;
+        while ((m = re.exec(line))) cells.push(m[1].replace(/""/g, '"').trim());
+        return cells;
+      }).filter(function(c, i) { return c.length >= 2 && c[0] && c[1] && i > 0; });
+
+      /* Sanity: never wipe the menu over a broken/near-empty sheet */
+      if (rows.length < 5) return;
+
+      var esc = function(t) { var d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; };
+
+      /* Group rows by section, preserving first-appearance order */
+      var order = [], groups = {};
+      rows.forEach(function(r) {
+        var sec = r[0];
+        if (!groups[sec]) { groups[sec] = { tag: '', dishes: [] }; order.push(sec); }
+        if (r[4]) groups[sec].tag = r[4];
+        groups[sec].dishes.push({ name: r[1], note: r[2] || '', price: r[3] || '' });
+      });
+
+      var html = '';
+      order.forEach(function(sec) {
+        var g = groups[sec];
+        html += '<div class="mgroup">';
+        html += '<div class="mgroup__title">' + esc(sec) + '</div>';
+        if (g.tag) html += '<span class="mgroup__tag">' + esc(g.tag) + '</span>';
+        g.dishes.forEach(function(d) {
+          html += '<div class="dish"><div class="dish__row">';
+          html += '<span class="dish__name">' + esc(d.name) + '</span>';
+          html += '<span class="dish__dots"></span>';
+          html += '<span class="dish__price">' + esc(d.price) + '</span>';
+          html += '</div>';
+          if (d.note) html += '<p class="dish__note">' + esc(d.note) + '</p>';
+          html += '</div>';
+        });
+        html += '</div>';
+      });
+
+      var cols = document.querySelector('.menucard__cols');
+      if (cols && html) cols.innerHTML = html;
+    })
+    .catch(function() { /* built-in menu stays */ });
+})();
+</script>
 </body>
 </html>
